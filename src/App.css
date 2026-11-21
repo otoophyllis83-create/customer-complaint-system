@@ -1,0 +1,296 @@
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background-color: #f1f5f9;
+  color: #1e293b;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  background-color: #123b63;
+  color: white;
+  text-align: center;
+  padding: 35px 20px;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  text-align: left;
+}
+
+.header h1 {
+  margin: 0 0 12px;
+}
+
+.header p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.role-badge {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+
+.main-panel {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 30px 20px;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.main-panel.narrow {
+  align-items: center;
+}
+
+.main-panel.stack {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.welcome-card,
+.card {
+  width: 100%;
+  max-width: 520px;
+  background-color: white;
+  padding: 35px;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.welcome-card h2,
+.card h2 {
+  color: #123b63;
+  margin-top: 0;
+}
+
+.welcome-card p,
+.card p {
+  line-height: 1.8;
+  color: #475569;
+}
+
+.button-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 1.25rem;
+}
+
+button {
+  background-color: #0f766e;
+  color: white;
+  border: none;
+  padding: 13px 25px;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #115e59;
+}
+
+button.secondary {
+  background-color: #64748b;
+}
+
+button.secondary:hover {
+  background-color: #475569;
+}
+
+button.link-button {
+  background: transparent;
+  color: #0f766e;
+  padding: 0;
+  margin-top: 1rem;
+  text-decoration: underline;
+}
+
+.footer {
+  background-color: #e2e8f0;
+  color: #475569;
+  text-align: center;
+  padding: 15px;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  gap: 10px;
+  margin-top: 25px;
+}
+
+form label {
+  font-weight: bold;
+  font-size: 14px;
+}
+
+form input,
+form select,
+form textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+
+form textarea {
+  resize: vertical;
+}
+
+form input:focus,
+form select:focus,
+form textarea:focus {
+  outline: 2px solid #0f766e;
+  border-color: #0f766e;
+}
+
+form button {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.secret-box {
+  margin-top: 1rem;
+  background: #ecfeff;
+  border: 1px solid #a5f3fc;
+  border-radius: 10px;
+  padding: 1rem;
+  text-align: left;
+}
+
+.secret-box ol {
+  padding-left: 1.25rem;
+  line-height: 1.7;
+  color: #475569;
+}
+
+.totp-secret {
+  overflow-wrap: anywhere;
+}
+
+.totp-secret code,
+.totp-uri {
+  display: inline-block;
+  font-family: monospace;
+  overflow-wrap: anywhere;
+  color: #123b63;
+}
+
+.copy-secret {
+  margin-bottom: 1rem;
+}
+
+.secret-box details {
+  margin-top: 0.75rem;
+}
+
+.secret-box summary {
+  cursor: pointer;
+  color: #0f766e;
+  font-weight: 700;
+}
+
+.totp-warning {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.panel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  width: min(1100px, 100%);
+  gap: 1rem;
+}
+
+.panel-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.panel-card h2 {
+  color: #123b63;
+  margin-top: 0;
+}
+
+.complaints-list {
+  width: min(1100px, 100%);
+}
+
+.complaint-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1rem;
+  margin: 1rem 0;
+  text-align: left;
+}
+
+.complaint-card h3 {
+  margin-top: 0;
+  color: #123b63;
+}
+
+.complaint-card p {
+  margin: 0.35rem 0;
+}
+
+.status-editor {
+  margin-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  text-align: left;
+}
+
+.status-editor label {
+  font-weight: 700;
+  color: #123b63;
+}
+
+.status-editor textarea,
+.status-editor select {
+  margin-bottom: 0;
+}
