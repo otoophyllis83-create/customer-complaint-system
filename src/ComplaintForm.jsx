@@ -74,7 +74,7 @@ function ComplaintForm({ token, user }) {
           id="customer_name"
           name="customer_name"
           value={formData.customer_name}
-          onChange={handleChange}
+          readOnly
           required
         />
 
@@ -84,7 +84,7 @@ function ComplaintForm({ token, user }) {
           name="customer_email"
           type="email"
           value={formData.customer_email}
-          onChange={handleChange}
+          readOnly
           required
         />
 

@@ -6,6 +6,8 @@ const { memoryStore } = require('./db')
 
 const allowedStatuses = ['Pending', 'Under Review', 'Assigned', 'In Progress', 'Resolved', 'Closed']
 const staffRoles = new Set(['SUPPORT', 'MANAGER', 'ADMINISTRATOR'])
+const allowedCategories = ['General', 'Billing', 'Service', 'Product', 'Technical']
+const allowedPriorities = ['Low', 'Medium', 'High', 'Urgent']
 
 const normalizeStatus = (status) => {
   return allowedStatuses.includes(status) ? status : 'Pending'
@@ -14,30 +16,44 @@ const normalizeStatus = (status) => {
 const canViewComplaint = (user, complaint) => {
   if (!user) return false
   if (staffRoles.has(user.role)) return true
-  return complaint.customer_email === user.email
+  return complaint.customer_id
+    ? complaint.customer_id === user.id
+    : complaint.customer_email === user.email
 }
 
 router.post('/', async (req, res) => {
-  const { customer_name, customer_email, subject, description, category, priority } = req.body
-
-  if (!customer_name || !customer_email || !subject || !description) {
-    return res.status(400).json({ message: 'Please fill in all required fields.' })
+  if (!req.user || req.user.role !== 'CUSTOMER') {
+    return res.status(403).json({ message: 'Only signed-in customers can submit complaints.' })
   }
 
+  const body = req.body && typeof req.body === 'object' ? req.body : {}
+  const subject = typeof body.subject === 'string' ? body.subject.trim() : ''
+  const description = typeof body.description === 'string' ? body.description.trim() : ''
+  const category = body.category || 'General'
+  const priority = body.priority || 'Medium'
+  if (!subject || subject.length > 200 || !description || description.length > 5000) {
+    return res.status(400).json({ message: 'Enter a subject (up to 200 characters) and description (up to 5,000 characters).' })
+  }
+  if (!allowedCategories.includes(category) || !allowedPriorities.includes(priority)) {
+    return res.status(400).json({ message: 'Choose a valid complaint category and priority.' })
+  }
+
+  const now = new Date().toISOString()
   const complaint = {
     id: crypto.randomUUID(),
-    customer_name: String(customer_name).trim(),
-    customer_email: String(customer_email).trim(),
-    subject: String(subject).trim(),
-    description: String(description).trim(),
-    category: String(category || 'General').trim(),
-    priority: String(priority || 'Medium').trim(),
+    customer_id: req.user.id,
+    customer_name: req.user.name,
+    customer_email: req.user.email,
+    subject,
+    description,
+    category,
+    priority,
     status: 'Pending',
     assigned_staff: null,
     staff_response: '',
     resolution: '',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: now,
+    updated_at: now,
     resolved_at: null
   }
 
