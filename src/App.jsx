@@ -43,6 +43,13 @@ function App() {
   const [complaintsError, setComplaintsError] = useState('')
   const [complaintsRefresh, setComplaintsRefresh] = useState(0)
   const [serverMessage, setServerMessage] = useState('Connecting to backend...')
+  const [backupPassphrase, setBackupPassphrase] = useState('')
+  const [restorePassphrase, setRestorePassphrase] = useState('')
+  const [restoreConfirmation, setRestoreConfirmation] = useState('')
+  const [backupFile, setBackupFile] = useState(null)
+  const [backupMessage, setBackupMessage] = useState('')
+  const [backupBusy, setBackupBusy] = useState(false)
+  const [authNotice, setAuthNotice] = useState('')
   const recoveryToken = new URLSearchParams(window.location.search).get('resetToken')
 
   useEffect(() => {
@@ -86,6 +93,7 @@ function App() {
   }, [session?.token, complaintsRefresh])
 
   const handleAuthenticated = (userSession) => {
+    setAuthNotice('')
     localStorage.setItem('complaint-session', JSON.stringify(userSession))
     setSession(userSession)
     setView('dashboard')
@@ -164,6 +172,7 @@ function App() {
           <h1>Customer Complaint System</h1>
         </header>
         <main className="main-panel narrow">
+          {authNotice && <p className="restore-notice" role="status">{authNotice}</p>}
           <Login
             recoveryToken={recoveryToken}
             onAuthenticated={handleAuthenticated}
@@ -269,6 +278,84 @@ function App() {
     const toggleNotificationBadges = (enabled) => {
       setNotificationBadgesEnabled(enabled)
       localStorage.setItem(`complaint-notification-preferences-${userId}`, String(enabled))
+    }
+
+    const handleCreateBackup = async (event) => {
+      event.preventDefault()
+      setBackupMessage('')
+      setBackupBusy(true)
+      try {
+        const response = await fetch(`${API_BASE}/api/admin/backup`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-session-token': session.token
+          },
+          body: JSON.stringify({ passphrase: backupPassphrase })
+        })
+        if (!response.ok) {
+          const data = await response.json()
+          throw new Error(data.message || 'Could not create the backup.')
+        }
+        const blob = await response.blob()
+        const downloadUrl = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = downloadUrl
+        link.download = `customer-complaint-backup-${new Date().toISOString().slice(0, 10)}.json`
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        URL.revokeObjectURL(downloadUrl)
+        setBackupMessage('Encrypted backup downloaded. Keep the passphrase separate from the backup file.')
+        setBackupPassphrase('')
+      } catch (error) {
+        setBackupMessage(error.message || 'Could not create the backup.')
+      } finally {
+        setBackupBusy(false)
+      }
+    }
+
+    const handleRestoreBackup = async (event) => {
+      event.preventDefault()
+      setBackupMessage('')
+      if (!backupFile) {
+        setBackupMessage('Choose an encrypted backup file first.')
+        return
+      }
+      setBackupBusy(true)
+      try {
+        const backup = JSON.parse(await backupFile.text())
+        const response = await fetch(`${API_BASE}/api/admin/restore`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-session-token': session.token
+          },
+          body: JSON.stringify({
+            backup,
+            passphrase: restorePassphrase,
+            confirmation: restoreConfirmation
+          })
+        })
+        const data = await response.json()
+        if (!response.ok) throw new Error(data.message || 'Could not restore the backup.')
+
+        localStorage.removeItem('complaint-session')
+        setSession(null)
+        setComplaints([])
+        setBackupMessage('')
+        setRestorePassphrase('')
+        setRestoreConfirmation('')
+        setBackupFile(null)
+        setAuthNotice(data.message)
+        setView('login')
+      } catch (error) {
+        setBackupMessage(error instanceof SyntaxError
+          ? 'The selected file is not valid JSON.'
+          : error.message || 'Could not restore the backup.')
+      } finally {
+        setBackupBusy(false)
+      }
     }
 
     const statusCounts = complaints.reduce((counts, complaint) => {
@@ -515,6 +602,62 @@ function App() {
                     <strong>Sign-in protection</strong>
                     <p>Your account uses password verification and a time-based authenticator code. Contact an administrator if you need to recover account access.</p>
                   </div>
+                  {isAdministrator && (
+                    <section className="backup-tools" aria-labelledby="backup-heading">
+                      <h3 id="backup-heading">Database backup and recovery</h3>
+                      <p>Create an encrypted copy of all users, complaints, and audit history. Restore replaces current records and signs everyone out.</p>
+                      <form className="backup-form" onSubmit={handleCreateBackup}>
+                        <label htmlFor="backup-passphrase">Backup passphrase</label>
+                        <input
+                          id="backup-passphrase"
+                          type="password"
+                          minLength="12"
+                          maxLength="1024"
+                          autoComplete="new-password"
+                          required
+                          value={backupPassphrase}
+                          onChange={(event) => setBackupPassphrase(event.target.value)}
+                          placeholder="At least 12 characters"
+                        />
+                        <button type="submit" disabled={backupBusy}>
+                          {backupBusy ? 'Working…' : 'Download encrypted backup'}
+                        </button>
+                      </form>
+                      <form className="backup-form restore-form" onSubmit={handleRestoreBackup}>
+                        <label htmlFor="restore-backup-file">Encrypted backup file</label>
+                        <input
+                          id="restore-backup-file"
+                          type="file"
+                          accept="application/json,.json"
+                          required
+                          onChange={(event) => setBackupFile(event.target.files?.[0] || null)}
+                        />
+                        <label htmlFor="restore-passphrase">Backup passphrase</label>
+                        <input
+                          id="restore-passphrase"
+                          type="password"
+                          minLength="12"
+                          maxLength="1024"
+                          autoComplete="current-password"
+                          required
+                          value={restorePassphrase}
+                          onChange={(event) => setRestorePassphrase(event.target.value)}
+                        />
+                        <label htmlFor="restore-confirmation">Type RESTORE to replace existing data</label>
+                        <input
+                          id="restore-confirmation"
+                          type="text"
+                          required
+                          value={restoreConfirmation}
+                          onChange={(event) => setRestoreConfirmation(event.target.value)}
+                        />
+                        <button className="secondary" type="submit" disabled={backupBusy || restoreConfirmation !== 'RESTORE'}>
+                          Restore backup
+                        </button>
+                      </form>
+                      {backupMessage && <p className="form-message" role="status">{backupMessage}</p>}
+                    </section>
+                  )}
                 </div>
               </section>
             )}

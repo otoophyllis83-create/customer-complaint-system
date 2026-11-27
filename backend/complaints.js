@@ -2,7 +2,7 @@
 const express = require('express')
 const router = express.Router()
 const crypto = require('crypto')
-const { memoryStore } = require('./db')
+const storage = require('./db')
 
 const allowedStatuses = ['Pending', 'Under Review', 'Assigned', 'In Progress', 'Resolved', 'Closed']
 const staffRoles = new Set(['SUPPORT', 'MANAGER', 'ADMINISTRATOR'])
@@ -57,16 +57,17 @@ router.post('/', async (req, res) => {
     resolved_at: null
   }
 
-  memoryStore.complaints.unshift(complaint)
+  const savedComplaint = await storage.createComplaint(complaint)
 
   res.status(201).json({
     message: 'Complaint submitted successfully!',
-    complaint
+    complaint: savedComplaint
   })
 })
 
 router.get('/', async (req, res) => {
-  const visibleComplaints = memoryStore.complaints
+  const complaints = await storage.listComplaints()
+  const visibleComplaints = complaints
     .filter((complaint) => canViewComplaint(req.user, complaint))
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
 
@@ -76,8 +77,8 @@ router.get('/', async (req, res) => {
   })
 })
 
-router.get('/:id', (req, res) => {
-  const complaint = memoryStore.complaints.find((item) => item.id === req.params.id)
+router.get('/:id', async (req, res) => {
+  const complaint = await storage.findComplaintById(req.params.id)
   if (!complaint) {
     return res.status(404).json({ message: 'Complaint not found.' })
   }
@@ -89,9 +90,9 @@ router.get('/:id', (req, res) => {
   res.json({ complaint })
 })
 
-router.patch('/:id/status', (req, res) => {
+router.patch('/:id/status', async (req, res) => {
   const { status, staff_response, resolution, assigned_staff } = req.body
-  const complaint = memoryStore.complaints.find((item) => item.id === req.params.id)
+  const complaint = await storage.findComplaintById(req.params.id)
 
   if (!complaint) {
     return res.status(404).json({ message: 'Complaint not found.' })
@@ -120,7 +121,8 @@ router.patch('/:id/status', (req, res) => {
   }
   complaint.updated_at = new Date().toISOString()
 
-  res.json({ message: 'Complaint status updated successfully.', complaint })
+  const savedComplaint = await storage.updateComplaint(complaint)
+  res.json({ message: 'Complaint status updated successfully.', complaint: savedComplaint })
 })
 
 module.exports = router

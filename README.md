@@ -13,7 +13,9 @@ A secure customer complaint management app built with React + Vite on the fronte
 - Complaint submission and role-based complaint visibility
 - Staff complaint status updates and response logging
 - Audit logging and admin security report
-- In-memory fallback for local development when no database is configured
+- PostgreSQL-backed users, complaints, sessions, password recovery, and audit history
+- Administrator-only encrypted backup and recovery
+- Explicit in-memory mode for local development and tests
 
 ## Project structure
 
@@ -63,7 +65,7 @@ Set the result as `ADMIN_SETUP_KEY` in `backend/.env`, then restart the backend.
 
    curl.exe -X POST http://127.0.0.1:5000/api/bootstrap-admin -H "Content-Type: application/json" -d "{\"fullName\":\"System Administrator\",\"email\":\"admin@example.com\",\"password\":\"Choose-A-Strong-Password\",\"setupKey\":\"YOUR_ADMIN_SETUP_KEY\"}"
 
-The API rejects non-local requests and only permits bootstrap while no administrator exists. Save the returned TOTP setup key for the administrator. Keep the setup key private in `backend/.env`; it cannot be used from the public site or after an administrator exists. The current in-memory backend loses all accounts when restarted, as noted below.
+The API rejects non-local requests and only permits bootstrap while no administrator exists. Save the returned TOTP setup key for the administrator. Keep the setup key private in `backend/.env`; it cannot be used from the public site or after an administrator exists.
 
 Administrators can create Manager or Administrator accounts from their dashboard. The administrator supplies a temporary password and securely shares it together with the generated authenticator key. Other roles cannot be assigned through this endpoint.
 
@@ -85,8 +87,10 @@ Recovery links are single-use, expire after 30 minutes, and are stored only as S
 
 For local development without SMTP, set `RECOVERY_EMAIL_MODE=console` in the environment file used by the backend and restart it. When requested over a loopback connection, the response will include a one-time link in the browser. The backend disables this mode in production and for non-local connections. SMTP is required for emailed recovery.
 
-## Notes
+## PostgreSQL persistence
 
-- The app defaults to an in-memory store when no valid PostgreSQL connection is available.
-- Accounts, complaints, and pending recovery links are lost when the in-memory backend restarts.
-- For a production deployment, configure a real `DATABASE_URL` and replace the fallback storage with persistent database-backed models.
+Set `DATABASE_URL` in the environment file loaded by the backend to a reachable PostgreSQL connection string, for example `postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require`. On startup, the backend creates the required `ccs_*` tables and indexes. When a database URL is configured but PostgreSQL cannot be reached, startup fails instead of silently switching to volatile memory. Production mode also requires PostgreSQL. Set `REQUIRE_DATABASE=true` to require PostgreSQL in other environments. The intentional memory store is available for tests or local-only use with `STORAGE_MODE=memory`; its data is lost on restart.
+
+Administrators can create an encrypted JSON backup from **Settings → Database backup and recovery**. Choose a strong passphrase of at least 12 characters and keep it separate from the downloaded file. The backup includes user credentials and authenticator secrets, complaints, and audit history, encrypted with AES-256-GCM and a scrypt-derived key. Restore requires the backup file, its passphrase, and typing `RESTORE`; it replaces current records and invalidates every session and pending recovery link. Backups cannot be recovered without their passphrase.
+
+Back up the active in-memory data before switching to PostgreSQL if it must be preserved. PostgreSQL enables durable storage only for data written after its connection is configured; it does not automatically migrate data from an already-running in-memory process.

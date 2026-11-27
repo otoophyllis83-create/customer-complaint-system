@@ -7,6 +7,7 @@ const { authenticator } = require('otplib')
 
 process.env.PEPPER = 'password-reset-test-pepper'
 process.env.ADMIN_SETUP_KEY = 'test-admin-setup-key-with-adequate-entropy'
+process.env.STORAGE_MODE = 'memory'
 
 const { app, memoryStore, passwordResetTokens, sessions } = require('../server')
 
@@ -457,6 +458,81 @@ test('role enforcement and email recovery protect customer and staff accounts', 
     })
     assert.equal(productionRequestResponse.status, 503)
     assert.equal((await productionRequestResponse.json()).recoveryUrl, undefined)
+
+    const usersBeforeBackup = [...memoryStore.users]
+    const complaintsBeforeBackup = [...memoryStore.complaints]
+    const auditLogsBeforeBackup = [...memoryStore.auditLogs]
+    const unauthenticatedBackupResponse = await fetch(`${apiBase}/api/admin/backup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ passphrase: 'Not-A-Backup-Passphrase' })
+    })
+    assert.equal(unauthenticatedBackupResponse.status, 401)
+
+    const backupPassphrase = 'Correct-Horse-Battery-42!'
+    const backupResponse = await fetch(`${apiBase}/api/admin/backup`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-session-token': adminSession.token
+      },
+      body: JSON.stringify({ passphrase: backupPassphrase })
+    })
+    assert.equal(backupResponse.status, 200)
+    const encryptedBackup = await backupResponse.json()
+    assert.equal(encryptedBackup.cipher, 'aes-256-gcm')
+    assert.equal(JSON.stringify(encryptedBackup).includes('admin@example.test'), false)
+
+    const invalidConfirmationResponse = await fetch(`${apiBase}/api/admin/restore`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-session-token': adminSession.token
+      },
+      body: JSON.stringify({
+        backup: encryptedBackup,
+        passphrase: backupPassphrase,
+        confirmation: 'no'
+      })
+    })
+    assert.equal(invalidConfirmationResponse.status, 400)
+
+    const wrongPassphraseResponse = await fetch(`${apiBase}/api/admin/restore`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-session-token': adminSession.token
+      },
+      body: JSON.stringify({
+        backup: encryptedBackup,
+        passphrase: 'Wrong-Passphrase-Definitely!',
+        confirmation: 'RESTORE'
+      })
+    })
+    assert.equal(wrongPassphraseResponse.status, 400)
+
+    const restoreResponse = await fetch(`${apiBase}/api/admin/restore`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-session-token': adminSession.token
+      },
+      body: JSON.stringify({
+        backup: encryptedBackup,
+        passphrase: backupPassphrase,
+        confirmation: 'RESTORE'
+      })
+    })
+    assert.equal(restoreResponse.status, 200)
+    assert.deepEqual(memoryStore.users, usersBeforeBackup)
+    assert.deepEqual(memoryStore.complaints, complaintsBeforeBackup)
+    assert.equal(memoryStore.auditLogs[0].action, 'backup_restored')
+    assert.deepEqual(memoryStore.auditLogs.slice(1), auditLogsBeforeBackup)
+    assert.equal(sessions.size, 0)
+    const invalidatedAdminSession = await fetch(`${apiBase}/api/me`, {
+      headers: { 'x-session-token': adminSession.token }
+    })
+    assert.equal(invalidatedAdminSession.status, 401)
   } finally {
     delete process.env.ADMIN_SETUP_KEY
     await new Promise((resolve, reject) => {
